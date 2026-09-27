@@ -7,6 +7,8 @@ utilities.
 
 from __future__ import annotations
 
+import re
+
 _LANGUAGE_LABELS: dict[str, str] = {
     "zh": "中文（简体）",
     "zh-cn": "中文（简体）",
@@ -20,11 +22,30 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "ru": "Русский",
     "pt": "Português",
     "it": "Italiano",
+    "vi": "Vietnamese",
 }
+
+_VIETNAMESE_MARKERS = re.compile(
+    r"[\u1ea0-\u1ef9\u0102\u0103\u00c2\u00e2\u0110\u0111\u00ca\u00ea\u00d4\u00f4"
+    r"\u01a0\u01a1\u01af\u01b0\u00c0\u00c1\u00c8\u00c9\u00cc\u00cd\u00d2\u00d3"
+    r"\u00d9\u00da\u00dd\u00e0\u00e1\u00e8\u00e9\u00ec\u00ed\u00f2\u00f3\u00f9"
+    r"\u00fa\u00fd]"
+)
+_CHINESE_MARKERS = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+_ENGLISH_MARKERS = re.compile(r"[A-Za-z]")
 
 
 def normalize_language(language: str | None) -> str:
     return (language or "en").strip().lower() or "en"
+
+
+def detect_language(text: str, fallback: str | None = "en") -> str:
+    """Detect supported query languages; preserve the requested fallback otherwise."""
+    if _VIETNAMESE_MARKERS.search(text):
+        return "vi"
+    if _CHINESE_MARKERS.search(text):
+        return "zh"
+    return "en" if _ENGLISH_MARKERS.search(text) else normalize_language(fallback)
 
 
 def language_label(language: str | None) -> str:
@@ -75,6 +96,7 @@ def append_language_directive(system_prompt: str | None, language: str | None) -
 
 __all__ = [
     "append_language_directive",
+    "detect_language",
     "language_directive",
     "language_label",
     "normalize_language",

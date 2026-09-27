@@ -7,6 +7,7 @@ from deeptutor.core.capability_protocol import BaseCapability, CapabilityManifes
 from deeptutor.core.context import UnifiedContext
 from deeptutor.core.stream_bus import StreamBus
 from deeptutor.runtime.request_contracts import get_capability_request_schema
+from deeptutor.services.prompt.language import detect_language
 
 
 class ChatCapability(BaseCapability):
@@ -23,5 +24,7 @@ class ChatCapability(BaseCapability):
     )
 
     async def run(self, context: UnifiedContext, stream: StreamBus) -> None:
-        pipeline = AgenticChatPipeline(language=context.language)
+        pipeline = AgenticChatPipeline(
+            language=detect_language(context.user_message, context.language)
+        )
         await pipeline.run(context, stream)

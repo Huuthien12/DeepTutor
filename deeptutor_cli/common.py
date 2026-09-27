@@ -21,7 +21,13 @@ from deeptutor.app import DeepTutorApp, TurnRequest
 
 from ._tool_result import ToolResultBuffer, ToolResultEntry
 
-console = Console()
+if sys.platform == "win32":
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            reconfigure(encoding="utf-8", errors="replace")
+
+console = Console(legacy_windows=False if sys.platform == "win32" else None)
 
 # Process-wide buffer that backs the ``/show`` REPL command. The buffer
 # lives at module scope so a single ``deeptutor chat`` session shares one
@@ -136,15 +142,22 @@ async def run_turn_and_render(
 
     if fmt == "json":
         await stream_turn_as_json(app=app, turn_id=turn["id"])
-        return session, turn
-
-    summary = await render_turn_stream(app=app, turn_id=turn["id"])
-    console.print(
-        f"[dim]session={session['id']} turn={turn['id']} "
-        f"capability={request.capability}{summary}[/]",
-        highlight=False,
-    )
+        summary = ""
+    else:
+        summary = await render_turn_stream(app=app, turn_id=turn["id"])
+    await _wait_for_turn_completion(app, turn["id"])
+    if fmt != "json":
+        console.print(
+            f"[dim]session={session['id']} turn={turn['id']} "
+            f"capability={request.capability}{summary}[/]",
+            highlight=False,
+        )
     return session, turn
+
+
+async def _wait_for_turn_completion(app: DeepTutorApp, turn_id: str) -> None:
+    while (turn := await app.store.get_turn(turn_id)) and turn.get("status") == "running":
+        await asyncio.sleep(0.05)
 
 
 async def regenerate_and_render(
