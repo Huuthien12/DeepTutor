@@ -88,7 +88,8 @@ class LlamaIndexPipeline:
         try:
             await self._verify_embedding_connectivity()
             documents = await self.document_loader.load(
-                file_paths, image_progress_callback=image_progress_callback
+                file_paths, image_progress_callback=image_progress_callback,
+                document_metadata=kwargs.get("document_metadata"),
             )
             if not documents:
                 self.logger.error("No valid documents found")

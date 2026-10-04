@@ -23,6 +23,19 @@ from deeptutor.services.rag.factory import DEFAULT_PROVIDER
 from deeptutor.services.rag.file_routing import FileTypeRouter
 
 console = Console()
+PROVENANCE_KEYS = frozenset({"original_filename", "original_mime_type", "original_sha256", "course_id", "document_id", "source", "normalizer_version"})
+
+
+def parse_provenance_metadata(value: Optional[str]) -> dict[str, str]:
+    if value is None:
+        return {}
+    try:
+        raw = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise typer.BadParameter("metadata must be a JSON object") from exc
+    if not isinstance(raw, dict):
+        raise typer.BadParameter("metadata must be a JSON object")
+    return {key: item for key, item in raw.items() if key in PROVENANCE_KEYS and isinstance(item, str)}
 
 
 def _get_kb_manager() -> KnowledgeBaseManager:
@@ -187,6 +200,7 @@ def register(app: typer.Typer) -> None:
         name: str = typer.Argument(..., help="KB name."),
         docs: list[str] = typer.Option([], "--doc", "-d", help="Document paths to add."),
         docs_dir: Optional[str] = typer.Option(None, "--docs-dir", help="Directory of documents."),
+        metadata_json: Optional[str] = typer.Option(None, "--metadata-json", help="Optional source provenance JSON."),
     ) -> None:
         """Add documents to an existing knowledge base."""
         mgr = _get_kb_manager()
@@ -214,6 +228,7 @@ def register(app: typer.Typer) -> None:
                     source_files=doc_paths,
                     base_dir=str(mgr.base_dir),
                     allow_duplicates=False,
+                    document_metadata=parse_provenance_metadata(metadata_json),
                 )
             )
         except Exception as exc:

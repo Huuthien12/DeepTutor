@@ -29,6 +29,11 @@ from deeptutor.services.rag.service import RAGService
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_DIR = "./data/knowledge_bases"
+PROVENANCE_KEYS = frozenset({"original_filename", "original_mime_type", "original_sha256", "course_id", "document_id", "source", "normalizer_version"})
+
+
+def _safe_provenance(metadata: dict[str, str] | None) -> dict[str, str]:
+    return {key: value for key, value in (metadata or {}).items() if key in PROVENANCE_KEYS and isinstance(value, str)}
 
 
 @dataclass(frozen=True)
@@ -295,7 +300,7 @@ class DocumentAdder:
 
         return files_to_process
 
-    async def process_new_documents(self, new_files: List[Path]) -> DocumentIndexResult:
+    async def process_new_documents(self, new_files: List[Path], document_metadata: dict[str, str] | None = None) -> DocumentIndexResult:
         """Index staged files via the KB's bound provider."""
         if not new_files:
             return DocumentIndexResult(processed_files=[], failures=[])
@@ -318,7 +323,7 @@ class DocumentAdder:
                         total=total_files,
                     )
 
-                success = await rag_service.add_documents(self.kb_name, [str(doc_file)])
+                success = await rag_service.add_documents(self.kb_name, [str(doc_file)], document_metadata=_safe_provenance(document_metadata))
                 if success:
                     processed_files.append(doc_file)
                     # Re-hashes the whole file, so it stays off the event loop:
@@ -392,6 +397,7 @@ async def add_documents(
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     allow_duplicates: bool = False,
+    document_metadata: dict[str, str] | None = None,
 ) -> int:
     """Convenience function used by CLI wrappers."""
     from deeptutor.knowledge.manager import KnowledgeBaseManager
@@ -436,7 +442,7 @@ async def add_documents(
                 },
             )
             return 0
-        result = await adder.process_new_documents(new_files)
+        result = await adder.process_new_documents(new_files, document_metadata=document_metadata)
         if result.has_failures:
             raise RuntimeError(
                 f"Failed to index {result.failed_count}/{len(new_files)} file(s): "

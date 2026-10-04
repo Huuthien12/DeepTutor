@@ -66,6 +66,7 @@ class LlamaIndexDocumentLoader:
         self,
         file_paths: Iterable[str],
         image_progress_callback: Callable[[int, int], None] | None = None,
+        document_metadata: dict[str, str] | None = None,
     ) -> list[Any]:
         documents: list[Any] = []
         image_sources: list[_ImageSource] = []
@@ -79,14 +80,14 @@ class LlamaIndexDocumentLoader:
             # the event loop stalls every other request for the whole PDF
             # (same class of bug as upstream #761/#777). Hand it to a thread.
             text, extracted_images = await asyncio.to_thread(self._parse_document, file_path)
-            self._append_if_nonempty(documents, file_path, text)
+            self._append_if_nonempty(documents, file_path, text, document_metadata)
             image_sources.extend(extracted_images)
 
         for file_path_str in classification.text_files:
             file_path = Path(file_path_str)
             self.logger.info(f"Parsing text: {file_path.name}")
             text = await FileTypeRouter.read_text_file(str(file_path))
-            self._append_if_nonempty(documents, file_path, text)
+            self._append_if_nonempty(documents, file_path, text, document_metadata)
 
         for file_path_str in classification.image_files:
             path = Path(file_path_str)
@@ -337,7 +338,7 @@ class LlamaIndexDocumentLoader:
             "mimetype": mimetype,
         }
 
-    def _append_if_nonempty(self, documents: list[Any], file_path: Path, text: str) -> None:
+    def _append_if_nonempty(self, documents: list[Any], file_path: Path, text: str, document_metadata: dict[str, str] | None = None) -> None:
         if text.strip():
             documents.append(
                 Document(
@@ -345,6 +346,7 @@ class LlamaIndexDocumentLoader:
                     metadata={
                         "file_name": file_path.name,
                         "file_path": str(file_path),
+                        **(document_metadata or {}),
                     },
                 )
             )
