@@ -243,7 +243,9 @@ class LlamaIndexPipeline:
                 set_progress_callback(progress_callback)
 
             documents = await self.document_loader.load(
-                file_paths, image_progress_callback=image_progress_callback
+                file_paths,
+                image_progress_callback=image_progress_callback,
+                document_metadata=kwargs.get("document_metadata"),
             )
             if not documents:
                 self.logger.warning("No valid documents to add")
